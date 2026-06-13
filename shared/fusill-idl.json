@@ -1,0 +1,1465 @@
+{
+  "address": "G6xojg6mCoin9HnQ1Nv1sXJyLTgjrNpY7M2CioW1Dy2c",
+  "metadata": {
+    "name": "fusill",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "cancel_job",
+      "docs": [
+        "User cancels the job if it expired without filling up."
+      ],
+      "discriminator": [
+        126,
+        241,
+        155,
+        241,
+        50,
+        236,
+        83,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "job_account",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_job",
+      "docs": [
+        "Node claims the job and gets registered in it."
+      ],
+      "discriminator": [
+        9,
+        160,
+        5,
+        231,
+        116,
+        123,
+        198,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "node_owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "node_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "node_owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "job_account",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_job",
+      "docs": [
+        "User creates a job and deposits payment for the nodes.",
+        "",
+        "When `scheduled_job` is true the job will not transition to Running when all nodes claim",
+        "it — it stays in Filled until the creator calls `schedule_job` to set the coordinated",
+        "execution timestamp.  This is the building block for multi-vector campaigns."
+      ],
+      "discriminator": [
+        178,
+        130,
+        217,
+        110,
+        100,
+        27,
+        82,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "job_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "arg",
+                "path": "created_at"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "created_at",
+          "type": "i64"
+        },
+        {
+          "name": "target",
+          "type": "string"
+        },
+        {
+          "name": "runner_type",
+          "type": {
+            "defined": {
+              "name": "RunnerType"
+            }
+          }
+        },
+        {
+          "name": "runner_config",
+          "type": "bytes"
+        },
+        {
+          "name": "duration_seconds",
+          "type": "u32"
+        },
+        {
+          "name": "min_nodes",
+          "type": "u8"
+        },
+        {
+          "name": "expiry_minutes",
+          "type": "u8"
+        },
+        {
+          "name": "payment_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "scheduled_job",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "finalize_job",
+      "docs": [
+        "Finalizes the job, computes consensus, and distributes payment.",
+        "",
+        "Payment distribution:",
+        "5%  → deployer (protocol fee, via Config)",
+        "95% → split among nodes that passed consensus",
+        "Dishonest or absent nodes do not get paid — their share goes to honest nodes",
+        "",
+        "remaining_accounts layout — N = reveals_submitted:",
+        "[0..N]   → ResultAccounts of nodes that revealed",
+        "[N..2N]  → Wallets of those nodes",
+        "[2N..3N] → NodeAccounts of those nodes (to update reputation)"
+      ],
+      "discriminator": [
+        141,
+        52,
+        35,
+        150,
+        40,
+        6,
+        140,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "job_account",
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "force_advance",
+      "docs": [
+        "Advances the job when a deadline has passed and a node failed to participate.",
+        "Can be called by anyone — rescue mechanism for the job.",
+        "remaining_accounts = NodeAccounts of nodes that did not participate."
+      ],
+      "discriminator": [
+        97,
+        107,
+        221,
+        244,
+        253,
+        40,
+        25,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "job_account",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initializes global program config.",
+        "Can only be called once by the deployer."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_node",
+      "docs": [
+        "Node registers with minimum 0.5 SOL stake."
+      ],
+      "discriminator": [
+        102,
+        85,
+        117,
+        114,
+        194,
+        188,
+        211,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "node_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "stake_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "reveal_result",
+      "docs": [
+        "PHASE 2 — Node reveals its actual results and nonce."
+      ],
+      "discriminator": [
+        251,
+        165,
+        27,
+        86,
+        52,
+        234,
+        133,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "node_owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "job_account",
+          "writable": true
+        },
+        {
+          "name": "result_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job_account"
+              },
+              {
+                "kind": "account",
+                "path": "node_owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "avg_latency_ms",
+          "type": "u32"
+        },
+        {
+          "name": "error_rate_bps",
+          "type": "u32"
+        },
+        {
+          "name": "requests_completed",
+          "type": "u64"
+        },
+        {
+          "name": "baseline_latency_ms",
+          "type": "u32"
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "schedule_job",
+      "docs": [
+        "Sets the coordinated execution timestamp on a filled scheduled job.",
+        "",
+        "Only the job creator can call this.  All nodes polling the job will see the transition",
+        "to Running and wait until `run_at` before firing the attack."
+      ],
+      "discriminator": [
+        187,
+        214,
+        87,
+        47,
+        48,
+        0,
+        155,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "job_account",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "run_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "submit_commitment",
+      "docs": [
+        "PHASE 1 — Node commits the hash of its results without revealing them."
+      ],
+      "discriminator": [
+        48,
+        171,
+        16,
+        125,
+        219,
+        133,
+        58,
+        87
+      ],
+      "accounts": [
+        {
+          "name": "node_owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "job_account",
+          "writable": true
+        },
+        {
+          "name": "result_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job_account"
+              },
+              {
+                "kind": "account",
+                "path": "node_owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw_stake",
+      "docs": [
+        "Node withdraws stake. Amount depends on reputation.",
+        "",
+        ">= 80 reputation → 100% stake refund",
+        "50-79            → 50% refund, 50% burned",
+        "< 50             → loses all, burned"
+      ],
+      "discriminator": [
+        153,
+        8,
+        22,
+        138,
+        105,
+        176,
+        87,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "node_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "incinerator",
+          "writable": true,
+          "address": "1nc1nerator11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "JobAccount",
+      "discriminator": [
+        91,
+        16,
+        162,
+        5,
+        45,
+        210,
+        125,
+        65
+      ]
+    },
+    {
+      "name": "NodeAccount",
+      "discriminator": [
+        125,
+        166,
+        18,
+        146,
+        195,
+        127,
+        86,
+        220
+      ]
+    },
+    {
+      "name": "ResultAccount",
+      "discriminator": [
+        164,
+        48,
+        92,
+        166,
+        25,
+        84,
+        42,
+        186
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CommitmentSubmitted",
+      "discriminator": [
+        183,
+        191,
+        48,
+        77,
+        90,
+        66,
+        117,
+        128
+      ]
+    },
+    {
+      "name": "JobCancelled",
+      "discriminator": [
+        203,
+        84,
+        143,
+        130,
+        48,
+        134,
+        74,
+        191
+      ]
+    },
+    {
+      "name": "JobClaimed",
+      "discriminator": [
+        176,
+        110,
+        104,
+        38,
+        27,
+        220,
+        61,
+        191
+      ]
+    },
+    {
+      "name": "JobCreated",
+      "discriminator": [
+        48,
+        110,
+        162,
+        177,
+        67,
+        74,
+        159,
+        131
+      ]
+    },
+    {
+      "name": "JobFinalized",
+      "discriminator": [
+        208,
+        205,
+        49,
+        160,
+        98,
+        139,
+        192,
+        217
+      ]
+    },
+    {
+      "name": "JobForceAdvanced",
+      "discriminator": [
+        4,
+        251,
+        227,
+        77,
+        224,
+        6,
+        57,
+        25
+      ]
+    },
+    {
+      "name": "JobReady",
+      "discriminator": [
+        183,
+        223,
+        241,
+        202,
+        137,
+        187,
+        190,
+        98
+      ]
+    },
+    {
+      "name": "JobScheduled",
+      "discriminator": [
+        112,
+        75,
+        85,
+        102,
+        247,
+        131,
+        108,
+        172
+      ]
+    },
+    {
+      "name": "NodeRegistered",
+      "discriminator": [
+        15,
+        57,
+        183,
+        59,
+        93,
+        55,
+        157,
+        195
+      ]
+    },
+    {
+      "name": "ProgramInitialized",
+      "discriminator": [
+        43,
+        70,
+        110,
+        241,
+        199,
+        218,
+        221,
+        245
+      ]
+    },
+    {
+      "name": "ResultRevealed",
+      "discriminator": [
+        109,
+        13,
+        202,
+        85,
+        148,
+        63,
+        148,
+        192
+      ]
+    },
+    {
+      "name": "StakeWithdrawn",
+      "discriminator": [
+        33,
+        120,
+        159,
+        58,
+        140,
+        255,
+        174,
+        79
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "StakeTooLow",
+      "msg": "Minimum stake required: 0.5 SOL"
+    },
+    {
+      "code": 6001,
+      "name": "TargetTooLong",
+      "msg": "Target too long, maximum 200 characters"
+    },
+    {
+      "code": 6002,
+      "name": "RunnerConfigTooLarge",
+      "msg": "Runner config too large, maximum 500 bytes"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidParams",
+      "msg": "Invalid parameters"
+    },
+    {
+      "code": 6004,
+      "name": "PaymentTooLow",
+      "msg": "Payment is insufficient to cover minimum node compensation"
+    },
+    {
+      "code": 6005,
+      "name": "JobNotOpen",
+      "msg": "Job is not open for claims"
+    },
+    {
+      "code": 6006,
+      "name": "JobNotFilled",
+      "msg": "Job is not in Filled state"
+    },
+    {
+      "code": 6007,
+      "name": "JobNotCancellable",
+      "msg": "Job cannot be cancelled in its current state"
+    },
+    {
+      "code": 6008,
+      "name": "JobAlreadyFull",
+      "msg": "Job is already full"
+    },
+    {
+      "code": 6009,
+      "name": "NodeNotActive",
+      "msg": "Node is not active"
+    },
+    {
+      "code": 6010,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6011,
+      "name": "JobNotRunning",
+      "msg": "Job is not in Running state"
+    },
+    {
+      "code": 6012,
+      "name": "JobNotInRevealPhase",
+      "msg": "Job is not in reveal phase"
+    },
+    {
+      "code": 6013,
+      "name": "JobExpired",
+      "msg": "Job expired without filling up"
+    },
+    {
+      "code": 6014,
+      "name": "JobNotExpired",
+      "msg": "Job has not expired yet"
+    },
+    {
+      "code": 6015,
+      "name": "JobNotFinalizable",
+      "msg": "Job is not ready to finalize"
+    },
+    {
+      "code": 6016,
+      "name": "MissingAccounts",
+      "msg": "Missing accounts in remaining_accounts"
+    },
+    {
+      "code": 6017,
+      "name": "CommitmentMismatch",
+      "msg": "Hash does not match the commitment"
+    },
+    {
+      "code": 6018,
+      "name": "AlreadyRevealed",
+      "msg": "This node has already revealed its results"
+    },
+    {
+      "code": 6019,
+      "name": "ResultNotRevealed",
+      "msg": "Result has not been revealed yet"
+    },
+    {
+      "code": 6020,
+      "name": "CommitDeadlinePassed",
+      "msg": "Commit deadline has passed"
+    },
+    {
+      "code": 6021,
+      "name": "RevealDeadlinePassed",
+      "msg": "Reveal deadline has passed"
+    },
+    {
+      "code": 6022,
+      "name": "DeadlineNotReached",
+      "msg": "Deadline has not been reached yet"
+    },
+    {
+      "code": 6023,
+      "name": "NoParticipantsYet",
+      "msg": "No nodes have participated yet"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidJobStatus",
+      "msg": "Invalid job status for this operation"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidAccount",
+      "msg": "Account does not belong to the program"
+    },
+    {
+      "code": 6026,
+      "name": "NodeNotInJob",
+      "msg": "Node is not registered in this job"
+    }
+  ],
+  "types": [
+    {
+      "name": "CommitmentSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "node",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "target",
+            "type": "string"
+          },
+          {
+            "name": "runner_type",
+            "type": {
+              "defined": {
+                "name": "RunnerType"
+              }
+            }
+          },
+          {
+            "name": "runner_config",
+            "type": "bytes"
+          },
+          {
+            "name": "duration_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "min_nodes",
+            "type": "u8"
+          },
+          {
+            "name": "nodes_claimed",
+            "type": "u8"
+          },
+          {
+            "name": "commits_submitted",
+            "type": "u8"
+          },
+          {
+            "name": "reveals_submitted",
+            "type": "u8"
+          },
+          {
+            "name": "payment",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "JobStatus"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "commit_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "reveal_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "ownership_verified",
+            "type": "bool"
+          },
+          {
+            "name": "claimed_nodes",
+            "type": {
+              "array": [
+                "pubkey",
+                10
+              ]
+            }
+          },
+          {
+            "name": "scheduled_job",
+            "type": "bool"
+          },
+          {
+            "name": "scheduled_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "refund",
+            "type": "u64"
+          },
+          {
+            "name": "nodes_compensated",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "node",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "target",
+            "type": "string"
+          },
+          {
+            "name": "runner_type",
+            "type": {
+              "defined": {
+                "name": "RunnerType"
+              }
+            }
+          },
+          {
+            "name": "payment",
+            "type": "u64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "honest_nodes",
+            "type": "u8"
+          },
+          {
+            "name": "payment_per_honest",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobForceAdvanced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobReady",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "target",
+            "type": "string"
+          },
+          {
+            "name": "runner_type",
+            "type": {
+              "defined": {
+                "name": "RunnerType"
+              }
+            }
+          },
+          {
+            "name": "runner_config",
+            "type": "bytes"
+          },
+          {
+            "name": "duration_seconds",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobScheduled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "run_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Filled"
+          },
+          {
+            "name": "Running"
+          },
+          {
+            "name": "RevealPhase"
+          },
+          {
+            "name": "PendingFinalization"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NodeAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake",
+            "type": "u64"
+          },
+          {
+            "name": "jobs_completed",
+            "type": "u64"
+          },
+          {
+            "name": "reputation",
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NodeRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "node",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResultAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "node",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "committed_at",
+            "type": "i64"
+          },
+          {
+            "name": "revealed",
+            "type": "bool"
+          },
+          {
+            "name": "avg_latency_ms",
+            "type": "u32"
+          },
+          {
+            "name": "error_rate_bps",
+            "type": "u32"
+          },
+          {
+            "name": "requests_completed",
+            "type": "u64"
+          },
+          {
+            "name": "baseline_latency_ms",
+            "type": "u32"
+          },
+          {
+            "name": "revealed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResultRevealed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "node",
+            "type": "pubkey"
+          },
+          {
+            "name": "avg_latency_ms",
+            "type": "u32"
+          },
+          {
+            "name": "baseline_latency_ms",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RunnerType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "HttpFlood"
+          },
+          {
+            "name": "Slowloris"
+          },
+          {
+            "name": "Http2RapidReset"
+          },
+          {
+            "name": "Http2Continuation"
+          },
+          {
+            "name": "TlsExhaustion"
+          },
+          {
+            "name": "WebsocketExhaustion"
+          },
+          {
+            "name": "DnsFlood"
+          },
+          {
+            "name": "SynFlood"
+          },
+          {
+            "name": "UdpFlood"
+          },
+          {
+            "name": "Rudy"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "node",
+            "type": "pubkey"
+          },
+          {
+            "name": "refund",
+            "type": "u64"
+          },
+          {
+            "name": "burned",
+            "type": "u64"
+          },
+          {
+            "name": "reputation",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

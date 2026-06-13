@@ -1,0 +1,27 @@
+{
+  "name": "fusill-node-client",
+  "version": "0.1.0",
+  "description": "Fusill network node — claims load-test jobs on Solana, runs attack runners, and reports results via commit-reveal.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test":     "mocha --timeout 60000 'tests/**/*.test.js'",
+    "coverage": "c8 --reporter=text --reporter=lcov --include='src/**/*.js' mocha --timeout 60000 'tests/**/*.test.js'"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/web3.js": "^1.95.0",
+    "js-sha3": "^0.9.3",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "anchor-bankrun": "^0.5.0",
+    "c8": "^11.0.0",
+    "chai": "^4.3.4",
+    "dotenv": "^16.0.0",
+    "mocha": "^10.0.0",
+    "solana-bankrun": "^0.4.0"
+  }
+}

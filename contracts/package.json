@@ -1,0 +1,26 @@
+{
+  "name": "fusill-contracts",
+  "version": "0.1.0",
+  "description": "Fusill Anchor program — on-chain job lifecycle, commit-reveal consensus, staking and payouts.",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "test":     "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts",
+    "coverage": "CARGO_TARGET_DIR=/tmp/fusill-cov cargo llvm-cov --lib --summary-only"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@noble/hashes": "^1.5.0"
+  },
+  "devDependencies": {
+    "anchor-bankrun": "^0.5.0",
+    "solana-bankrun": "^0.4.0",
+    "chai": "^4.3.4",
+    "mocha": "^9.0.3",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.0.4",
+    "@types/bn.js": "^5.1.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^9.1.1"
+  }
+}

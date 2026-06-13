@@ -1,0 +1,5 @@
+.env
+node_modules/
+coverage/
+keypair.json
+smoke.js

@@ -1,0 +1,42 @@
+{
+  "name": "@fusill/sdk",
+  "version": "0.1.0",
+  "description": "Client SDK for Fusill — decentralized server resilience testing on Solana. Create and manage on-chain load-test jobs and read verified results.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/FusillClient.js",
+    "src/index.js",
+    "README.md"
+  ],
+  "keywords": [
+    "solana",
+    "anchor",
+    "depin",
+    "load-testing",
+    "web3",
+    "fusill"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test":     "mocha --timeout 60000 'tests/**/*.test.js'",
+    "coverage": "c8 --reporter=text --reporter=lcov --include='src/**/*.js' --exclude='src/demo.js' mocha --timeout 60000 'tests/**/*.test.js'"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/web3.js": "^1.95.0"
+  },
+  "devDependencies": {
+    "anchor-bankrun": "^0.5.0",
+    "c8": "^11.0.0",
+    "chai": "^4.3.4",
+    "mocha": "^10.0.0",
+    "solana-bankrun": "^0.4.0"
+  }
+}

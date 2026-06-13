@@ -1,0 +1,101 @@
+services:
+
+  # ── Deployment ──────────────────────────────────────────────────────────────
+  # Builds the contract, deploys to devnet, and initializes the Config account.
+  # Usage: docker compose --profile deploy run --rm deployer
+  deployer:
+    build:
+      context: ./contracts
+    profiles: [deploy]
+    volumes:
+      - ./contracts:/workspace
+      - ./scripts:/workspace/scripts:ro
+      - ~/.config/solana/id.json:/wallets/deployer.json:ro
+      - ./wallets:/wallets
+      - ./shared:/shared
+    working_dir: /workspace
+    command: bash /workspace/scripts/deploy.sh
+
+  # ── Nodes ───────────────────────────────────────────────────────────────────
+  node1:
+    build:
+      context: ./node-client
+    volumes:
+      - ./node-client:/app
+      - ./wallets:/wallets:ro
+      - ./shared:/shared:ro
+    environment:
+      - SOLANA_RPC_URL=https://api.devnet.solana.com
+      - NODE_KEYPAIR_PATH=/wallets/node1.json
+      - IDL_PATH=/shared/fusill-idl.json
+      - STAKE_LAMPORTS=500000000
+      - POLL_INTERVAL_SECONDS=5
+    cap_add:
+      - NET_RAW   # synFlood/udpFlood need raw sockets
+
+  node2:
+    build:
+      context: ./node-client
+    volumes:
+      - ./node-client:/app
+      - ./wallets:/wallets:ro
+      - ./shared:/shared:ro
+    environment:
+      - SOLANA_RPC_URL=https://api.devnet.solana.com
+      - NODE_KEYPAIR_PATH=/wallets/node2.json
+      - IDL_PATH=/shared/fusill-idl.json
+      - STAKE_LAMPORTS=500000000
+      - POLL_INTERVAL_SECONDS=5
+    cap_add:
+      - NET_RAW
+
+  node3:
+    build:
+      context: ./node-client
+    volumes:
+      - ./node-client:/app
+      - ./wallets:/wallets:ro
+      - ./shared:/shared:ro
+    environment:
+      - SOLANA_RPC_URL=https://api.devnet.solana.com
+      - NODE_KEYPAIR_PATH=/wallets/node3.json
+      - IDL_PATH=/shared/fusill-idl.json
+      - STAKE_LAMPORTS=500000000
+      - POLL_INTERVAL_SECONDS=5
+    cap_add:
+      - NET_RAW
+
+  # ── Demo target ─────────────────────────────────────────────────────────────
+  # Minimal HTTP server that answers the verify endpoint with the user's pubkey.
+  mock-target:
+    build:
+      context: ./node-client
+    volumes:
+      - ./node-client:/app
+      - ./wallets:/wallets:ro
+    environment:
+      # Serves the verify endpoint with the deployer pubkey (= the Phantom wallet
+      # used to create jobs from the web app), so ownership verification passes.
+      - USER_KEYPAIR_PATH=/wallets/deployer.json
+    command: node /app/src/mock-target.js
+    ports:
+      - "3000:3000"
+
+  # ── SDK client ──────────────────────────────────────────────────────────────
+  # Creates a job on devnet and waits for its finalization.
+  # Usage: docker compose --profile demo run --rm sdk-client
+  sdk-client:
+    build:
+      context: ./sdk
+    profiles: [demo]
+    volumes:
+      - ./sdk:/app
+      - ./wallets:/wallets:ro
+      - ./shared:/shared:ro
+    environment:
+      - SOLANA_RPC_URL=https://api.devnet.solana.com
+      - USER_KEYPAIR_PATH=/wallets/user.json
+      - IDL_PATH=/shared/fusill-idl.json
+      - TARGET_URL=http://mock-target:3000
+    depends_on:
+      - mock-target

@@ -1,0 +1,34 @@
+# === Dependencies ===
+node_modules/
+
+# === Build / coverage artifacts ===
+coverage/
+dist/
+target/
+.anchor/
+
+# Compiled native binaries (e.g. syn_flood from syn_flood.c)
+node-client/src/runners/syn_flood
+*.o
+*.out
+
+# === Secrets / keypairs ===
+.env
+.env.local
+.env.*.local
+wallets/*.json
+*-keypair.json
+keypair.json
+
+# === Editor / OS ===
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.swp
+
+# === Logs ===
+*.log
+npm-debug.log*
+
+notes/
