@@ -32,3 +32,6 @@ keypair.json
 npm-debug.log*
 
 notes/
+
+# === Grant proposal draft (private — contact info, amounts) ===
+grant-proposal-developer-tooling.md
