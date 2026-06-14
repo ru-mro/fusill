@@ -227,66 +227,130 @@ export async function finalizeJob(program, keypair, jobPubkey) {
  * Polls until the job transitions to Running.
  * Falls back to polling when the provider doesn't support WebSocket (e.g. bankrun).
  */
+/**
+ * Waits until a job account satisfies `predicate`, using a websocket account
+ * subscription as the fast path plus a low-frequency poll as a safety net.
+ *
+ * Why not just poll: a tight fetch loop hammers `getAccountInfo` (hundreds of
+ * calls per job) and gets rate-limited (429). `onAccountChange` pushes the full
+ * decoded state on every change, so we react instantly without polling.
+ *
+ * Why still poll (slowly): websocket notifications are best-effort — a dropped
+ * connection or missed notification would otherwise hang us forever. The fallback
+ * fetch (every `fallbackMs`) reconciles missed updates and keeps deadline-based
+ * `onState` logic (e.g. force_advance) ticking even when no account change fires.
+ *
+ * The initial fetch covers the case where the job is already in the target state,
+ * and the gap between subscribing and the first notification.
+ *
+ * @param {Program}   program
+ * @param {PublicKey} jobPubkey
+ * @param {(job: object) => boolean} predicate  — resolve when this returns true
+ * @param {object}    [opts]
+ * @param {number}    [opts.timeoutMs=300000]
+ * @param {number}    [opts.fallbackMs=10000]   — safety-net poll interval
+ * @param {(job: object) => Promise<void>|void} [opts.onState] — run on every observed state
+ * @returns {Promise<object>} the decoded job once the predicate holds
+ */
+function waitForJobStatus(program, jobPubkey, predicate, { timeoutMs = 300_000, fallbackMs = 10_000, onState } = {}) {
+  const connection = program.provider.connection;
+
+  return new Promise((resolve, reject) => {
+    let done   = false;
+    let subId  = null;
+    let poller = null;
+    let timer  = null;
+
+    const cleanup = () => {
+      if (subId !== null) connection.removeAccountChangeListener(subId).catch(() => {});
+      if (poller)         clearInterval(poller);
+      if (timer)          clearTimeout(timer);
+    };
+    const settle = (fn, arg) => { if (done) return; done = true; cleanup(); fn(arg); };
+
+    const handle = async (data) => {
+      if (done || !data) return;
+      let job;
+      try {
+        job = program.coder.accounts.decode('jobAccount', data);
+      } catch {
+        return; // stale layout from a previous deploy — ignore
+      }
+      if (predicate(job)) { settle(resolve, job); return; }
+      if (onState) {
+        try { await onState(job); } catch (err) { settle(reject, err); }
+      }
+    };
+
+    // Some providers (e.g. BankrunProvider in tests) have no websocket, so
+    // onAccountChange is unavailable — fall back to pure polling in that case.
+    const canSubscribe = typeof connection.onAccountChange === 'function';
+
+    // fast path: push the new state on every account change
+    if (canSubscribe) {
+      subId = connection.onAccountChange(jobPubkey, info => { handle(info.data); }, 'confirmed');
+    }
+
+    // With a subscription this is just a slow safety net; without one it IS the
+    // mechanism, so poll tightly.
+    const pollMs = canSubscribe ? fallbackMs : 400;
+    poller = setInterval(async () => {
+      try {
+        const info = await connection.getAccountInfo(jobPubkey, 'confirmed');
+        if (info) handle(info.data);
+      } catch { /* transient 429 — the next tick retries */ }
+    }, pollMs);
+
+    timer = setTimeout(
+      () => settle(reject, new Error(`Timeout esperando estado en job ${jobPubkey}`)),
+      timeoutMs,
+    );
+
+    // initial fetch: covers an already-satisfied state and the subscribe gap
+    connection.getAccountInfo(jobPubkey, 'confirmed')
+      .then(info => info && handle(info.data))
+      .catch(() => {});
+  });
+}
+
 export function waitForJobReady(program, jobPubkey, timeoutMs = 300_000) {
-  return _pollUntilRunning(program, jobPubkey, timeoutMs);
-}
-
-async function _pollUntilRunning(program, jobPubkey, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const job = await program.account.jobAccount.fetch(jobPubkey);
-    if (job.status.running !== undefined) return job;
-    await new Promise(r => setTimeout(r, 300));
-  }
-  throw new Error(`Timeout esperando que el job pase a Running (polling)`);
+  return waitForJobStatus(program, jobPubkey, j => j.status.running !== undefined, { timeoutMs });
 }
 
 /**
- * Polls until RevealPhase. Calls force_advance if the commit_deadline expires.
+ * Waits until RevealPhase. Calls force_advance once if the commit_deadline expires.
  */
-export async function waitForRevealPhase(program, keypair, jobPubkey, timeoutMs = 300_000) {
-  const start = Date.now();
+export function waitForRevealPhase(program, keypair, jobPubkey, timeoutMs = 300_000) {
   let forceAdvanceCalled = false;
 
-  while (Date.now() - start < timeoutMs) {
-    const job = await program.account.jobAccount.fetch(jobPubkey);
-
-    if (job.status.revealPhase !== undefined) return job;
-
-    const now = Math.floor(Date.now() / 1000);
-    if (!forceAdvanceCalled && job.status.running !== undefined && now >= job.commitDeadline.toNumber()) {
-      console.log(`[job ${jobPubkey.toString().slice(0, 8)}...] Deadline de commit vencido — llamando force_advance`);
-      await forceAdvance(program, keypair, jobPubkey);
-      forceAdvanceCalled = true;
-    }
-
-    await new Promise(r => setTimeout(r, 500));
-  }
-
-  throw new Error(`Timeout esperando RevealPhase en job ${jobPubkey}`);
+  return waitForJobStatus(program, jobPubkey, j => j.status.revealPhase !== undefined, {
+    timeoutMs,
+    onState: async (job) => {
+      const now = Math.floor(Date.now() / 1000);
+      if (!forceAdvanceCalled && job.status.running !== undefined && now >= job.commitDeadline.toNumber()) {
+        forceAdvanceCalled = true; // set before await — guards against concurrent ticks
+        console.log(`[job ${jobPubkey.toString().slice(0, 8)}...] Deadline de commit vencido — llamando force_advance`);
+        await forceAdvance(program, keypair, jobPubkey);
+      }
+    },
+  });
 }
 
 /**
- * Polls until PendingFinalization. Calls force_advance if the reveal_deadline expires.
+ * Waits until PendingFinalization. Calls force_advance once if the reveal_deadline expires.
  */
-export async function waitForPendingFinalization(program, keypair, jobPubkey, timeoutMs = 300_000) {
-  const start = Date.now();
+export function waitForPendingFinalization(program, keypair, jobPubkey, timeoutMs = 300_000) {
   let forceAdvanceCalled = false;
 
-  while (Date.now() - start < timeoutMs) {
-    const job = await program.account.jobAccount.fetch(jobPubkey);
-
-    if (job.status.pendingFinalization !== undefined) return job;
-
-    const now = Math.floor(Date.now() / 1000);
-    if (!forceAdvanceCalled && job.status.revealPhase !== undefined && now >= job.revealDeadline.toNumber()) {
-      console.log(`[job ${jobPubkey.toString().slice(0, 8)}...] Deadline de reveal vencido — llamando force_advance`);
-      await forceAdvance(program, keypair, jobPubkey);
-      forceAdvanceCalled = true;
-    }
-
-    await new Promise(r => setTimeout(r, 500));
-  }
-
-  throw new Error(`Timeout esperando PendingFinalization en job ${jobPubkey}`);
+  return waitForJobStatus(program, jobPubkey, j => j.status.pendingFinalization !== undefined, {
+    timeoutMs,
+    onState: async (job) => {
+      const now = Math.floor(Date.now() / 1000);
+      if (!forceAdvanceCalled && job.status.revealPhase !== undefined && now >= job.revealDeadline.toNumber()) {
+        forceAdvanceCalled = true; // set before await — guards against concurrent ticks
+        console.log(`[job ${jobPubkey.toString().slice(0, 8)}...] Deadline de reveal vencido — llamando force_advance`);
+        await forceAdvance(program, keypair, jobPubkey);
+      }
+    },
+  });
 }
