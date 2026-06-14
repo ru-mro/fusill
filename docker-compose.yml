@@ -29,7 +29,7 @@ services:
       - NODE_KEYPAIR_PATH=/wallets/node1.json
       - IDL_PATH=/shared/fusill-idl.json
       - STAKE_LAMPORTS=500000000
-      - POLL_INTERVAL_SECONDS=5
+      - POLL_INTERVAL_SECONDS=10
     cap_add:
       - NET_RAW   # synFlood/udpFlood need raw sockets
 
@@ -45,7 +45,7 @@ services:
       - NODE_KEYPAIR_PATH=/wallets/node2.json
       - IDL_PATH=/shared/fusill-idl.json
       - STAKE_LAMPORTS=500000000
-      - POLL_INTERVAL_SECONDS=5
+      - POLL_INTERVAL_SECONDS=10
     cap_add:
       - NET_RAW
 
@@ -61,7 +61,7 @@ services:
       - NODE_KEYPAIR_PATH=/wallets/node3.json
       - IDL_PATH=/shared/fusill-idl.json
       - STAKE_LAMPORTS=500000000
-      - POLL_INTERVAL_SECONDS=5
+      - POLL_INTERVAL_SECONDS=10
     cap_add:
       - NET_RAW
 
