@@ -3,6 +3,10 @@ import anchorPkg from '@coral-xyz/anchor';
 const { AnchorProvider, BN, Program, Wallet } = anchorPkg;
 import { readFileSync } from 'fs';
 
+// Job accounts whose on-chain layout no longer matches the IDL (leftovers from a
+// previous program deploy). We warn once per pubkey instead of spamming the log.
+const warnedStaleJobs = new Set();
+
 export async function initChain() {
   const keypairBytes = process.env.NODE_KEYPAIR_PATH
     ? JSON.parse(readFileSync(process.env.NODE_KEYPAIR_PATH, 'utf8'))
@@ -43,11 +47,38 @@ export async function registerNodeIfNeeded(program, keypair) {
 
 /**
  * Fetches all Open jobs sorted by payment descending.
- * We don't use memcmp because the target URL is a variable-length String —
- * the status field offset is not fixed, so we filter on the client side.
+ *
+ * We decode each account individually instead of using `program.account.jobAccount.all()`
+ * because that helper decodes the whole batch and throws on the first account it can't
+ * deserialize. Stale jobs from a previous program deploy still match the account
+ * discriminator (it's just hash("account:JobAccount")), so a single leftover account
+ * with an outdated layout would otherwise crash the entire poll loop. Here we skip
+ * undecodable accounts and keep going.
+ *
+ * We filter by status on the client side because the target URL is a variable-length
+ * String, so the status field offset is not fixed and can't be matched with memcmp.
  */
 export async function fetchOpenJobs(program) {
-  const jobs = await program.account.jobAccount.all();
+  const accountName = 'jobAccount';
+  const discriminator = program.coder.accounts.memcmp(accountName).bytes;
+
+  const rawAccounts = await program.provider.connection.getProgramAccounts(program.programId, {
+    filters: [{ memcmp: { offset: 0, bytes: discriminator } }],
+  });
+
+  const jobs = [];
+  for (const { pubkey, account } of rawAccounts) {
+    try {
+      const decoded = program.coder.accounts.decode(accountName, account.data);
+      jobs.push({ publicKey: pubkey, account: decoded });
+    } catch (err) {
+      const key = pubkey.toString();
+      if (!warnedStaleJobs.has(key)) {
+        warnedStaleJobs.add(key);
+        console.warn(`Skipping undecodable job account ${key.slice(0, 8)}... (stale layout: ${err.message})`);
+      }
+    }
+  }
 
   return jobs
     .filter(j => j.account.status.open !== undefined)

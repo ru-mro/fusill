@@ -309,12 +309,44 @@ export class FusillClient {
   }
 
   /**
+   * Fetches and decodes every job account, skipping any whose on-chain layout no
+   * longer matches the IDL (leftovers from a previous program deploy still match
+   * the account discriminator, which is just hash("account:JobAccount")).
+   *
+   * We decode each account individually rather than using
+   * `program.account.jobAccount.all()` because that helper decodes the whole batch
+   * and throws on the first undecodable account, which would break the listing.
+   *
+   * @returns {Promise<Array<{ publicKey: PublicKey, account: object }>>}
+   */
+  async _fetchAllJobsResilient() {
+    const accountName   = 'jobAccount';
+    const discriminator = this._program.coder.accounts.memcmp(accountName).bytes;
+
+    const rawAccounts = await this._program.provider.connection.getProgramAccounts(
+      this._program.programId,
+      { filters: [{ memcmp: { offset: 0, bytes: discriminator } }] },
+    );
+
+    const jobs = [];
+    for (const { pubkey, account } of rawAccounts) {
+      try {
+        const decoded = this._program.coder.accounts.decode(accountName, account.data);
+        jobs.push({ publicKey: pubkey, account: decoded });
+      } catch {
+        // Stale account from a previous program layout — skip it.
+      }
+    }
+    return jobs;
+  }
+
+  /**
    * Lists all jobs for this user, sorted by creation date descending.
    *
    * @returns {Promise<JobInfo[]>}
    */
   async listJobs() {
-    const all = await this._program.account.jobAccount.all();
+    const all = await this._fetchAllJobsResilient();
 
     return all
       .filter(j => j.account.owner.equals(this._user))
@@ -328,7 +360,7 @@ export class FusillClient {
    * @returns {Promise<JobInfo[]>}
    */
   async listAllJobs() {
-    const all = await this._program.account.jobAccount.all();
+    const all = await this._fetchAllJobsResilient();
 
     return all
       .map(j => this._formatJob(j.publicKey, j.account))

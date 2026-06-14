@@ -222,6 +222,27 @@ describe('cancelJob', () => {
 // in BanksClient). These tests use a mock program to cover the SDK's filtering
 // and sorting logic without depending on the network.
 
+// Builds a mock program whose surface matches what _fetchAllJobsResilient uses:
+// it fetches raw accounts via getProgramAccounts and decodes them with the coder.
+// We pass the already-built account object through `data` and have decode return it.
+function makeJobsMock(allAccounts) {
+  return {
+    programId: PublicKey.default,
+    provider: {
+      connection: {
+        getProgramAccounts: async () =>
+          allAccounts.map(a => ({ pubkey: a.publicKey, account: { data: a.account } })),
+      },
+    },
+    coder: {
+      accounts: {
+        memcmp: () => ({ offset: 0, bytes: '' }),
+        decode: (_name, data) => data,
+      },
+    },
+  };
+}
+
 describe('listJobs', () => {
   function makeJobRaw(owner, target, createdAtSec, paymentSol = 0.01) {
     return {
@@ -255,9 +276,7 @@ describe('listJobs', () => {
       { publicKey: pk3, account: makeJobRaw(userB, 'https://c.com', 3000) },
     ];
 
-    const mockProgram = {
-      account: { jobAccount: { all: async () => allAccounts } },
-    };
+    const mockProgram = makeJobsMock(allAccounts);
 
     const clientA = FusillClient._withProgram(userA, mockProgram);
     const clientB = FusillClient._withProgram(userB, mockProgram);
@@ -276,16 +295,10 @@ describe('listJobs', () => {
     const pk1  = Keypair.generate().publicKey;
     const pk2  = Keypair.generate().publicKey;
 
-    const mockProgram = {
-      account: {
-        jobAccount: {
-          all: async () => [
-            { publicKey: pk1, account: makeJobRaw(user, 'https://first.com',  1000) },
-            { publicKey: pk2, account: makeJobRaw(user, 'https://second.com', 2000) },
-          ],
-        },
-      },
-    };
+    const mockProgram = makeJobsMock([
+      { publicKey: pk1, account: makeJobRaw(user, 'https://first.com',  1000) },
+      { publicKey: pk2, account: makeJobRaw(user, 'https://second.com', 2000) },
+    ]);
 
     const client = FusillClient._withProgram(user, mockProgram);
     const jobs   = await client.listJobs();
@@ -322,16 +335,10 @@ describe('listAllJobs', () => {
       claimedNodes:     [],
     });
 
-    const mockProgram = {
-      account: {
-        jobAccount: {
-          all: async () => [
-            { publicKey: pk1, account: makeRaw(userA, 'https://cheap.com',     0.01) },
-            { publicKey: pk2, account: makeRaw(userB, 'https://expensive.com', 0.1)  },
-          ],
-        },
-      },
-    };
+    const mockProgram = makeJobsMock([
+      { publicKey: pk1, account: makeRaw(userA, 'https://cheap.com',     0.01) },
+      { publicKey: pk2, account: makeRaw(userB, 'https://expensive.com', 0.1)  },
+    ]);
 
     const client = FusillClient._withProgram(userA, mockProgram);
     const all    = await client.listAllJobs();
